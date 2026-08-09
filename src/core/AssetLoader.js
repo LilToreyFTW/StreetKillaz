@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { SkeletonUtils } from 'three/addons/utils/SkeletonUtils.js';
+import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 
 /**
  * Maps every asset category to its folder, matching the project's existing
@@ -55,7 +55,7 @@ export class AssetLoader {
         source = { scene: gltf.scene, animations: gltf.animations ?? [] };
         this._gltfCache.set(path, source);
       }
-      const scene = SkeletonUtils.clone(source.scene);
+      const scene = cloneSkeleton(source.scene);
       // Geometry/materials are shared with the cached source. Mark them so a
       // departing remote player never disposes assets still used by others.
       scene.traverse((object) => { object.userData.sharedGltfAsset = true; });

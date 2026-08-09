@@ -1,5 +1,24 @@
 # StreetKillaz
 
+## Vite + Vercel client
+
+Install and run the browser client locally:
+
+```powershell
+npm install
+npm run dev
+```
+
+Build the deployable static client:
+
+```powershell
+npm run build
+```
+
+Vercel serves the `dist` folder. The authoritative WebSocket server remains on
+the VPS; configure the production client to use a secure `wss://` endpoint
+before serving the game over HTTPS.
+
 StreetKillaz is a browser-based Three.js FPS prototype with:
 
 - Offline target arena and local Zombies testing
