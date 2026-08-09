@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>StreetKillaz</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --red: #ff3038;
+    --red-dark: #8d1118;
+    --gold: #ffb62e;
+    --panel: rgba(11, 12, 16, .95);
+    --panel-soft: rgba(20, 22, 29, .91);
+    --line: rgba(255,255,255,.13);
+    --muted: #9ba0aa;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: "Segoe UI", Arial, sans-serif; }
+  button, input, select { font: inherit; }
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; opacity: .45; }
+  canvas { display: block; }
+  [hidden] { display: none !important; }
+
+  #hud { position: fixed; inset: 0; pointer-events: none; color: #fff; text-shadow: 0 2px 5px #000; user-select: none; z-index: 5; }
+  #crosshair { position: absolute; top: 50%; left: 50%; width: 7px; height: 7px; background: #fff; border-radius: 50%; transform: translate(-50%, -50%) scale(var(--crosshair-scale,1)); box-shadow: 0 0 6px #000; transition: transform .08s ease-out; }
+  #damage-indicator { position:absolute; inset:0; opacity:0; transition:opacity .1s; }
+  #damage-indicator.show { opacity:1; }
+  #damage-indicator::before { content:'▲'; position:absolute; top:16%; left:50%; color:#ff454d; font-size:28px; transform:translateX(-50%); text-shadow:0 0 8px #000; }
+  #br-status { position:absolute; top:20px; left:50%; transform:translateX(-50%); padding:7px 11px; background:rgba(7,8,11,.72); border:1px solid rgba(84,190,255,.45); font-size:12px; font-weight:800; letter-spacing:.6px; }
+  #hitmarker { position: absolute; top: 50%; left: 50%; width: 28px; height: 28px; transform: translate(-50%, -50%); opacity: 0; transition: opacity .1s; }
+  #hitmarker.show { opacity: 1; }
+  #hitmarker.kill svg g { stroke: var(--red); }
+  #hitmarker.headshot svg g { stroke: #ffcf57; }
+  #hitmarker svg { width: 100%; height: 100%; }
+  #top-left { position: absolute; left: 22px; top: 20px; min-width: 260px; }
+  #bottom-left { position: absolute; left: 22px; bottom: 22px; min-width: 230px; }
+  #bottom-right { position: absolute; right: 22px; bottom: 22px; text-align: right; }
+  #network-status { position: absolute; top: 20px; right: 22px; padding: 7px 10px; border-radius: 4px; background: rgba(20,20,24,.7); border: 1px solid rgba(255,70,70,.35); font-size: 12px; font-weight: 800; letter-spacing: 1px; }
+  #network-status[data-online="true"] { border-color: rgba(65,255,147,.55); color: #72ffad; }
+  #kill-feed { position: absolute; right: 22px; top: 62px; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+  #scoreboard { position:fixed; z-index:11; top:12vh; left:50%; transform:translateX(-50%); width:min(720px,92vw); padding:16px; background:rgba(7,8,11,.94); border:1px solid rgba(255,255,255,.2); border-radius:8px; pointer-events:none; }
+  #scoreboard-title { margin-bottom:10px; font-weight:900; letter-spacing:1px; color:var(--gold); }
+  .scoreboard-row { padding:8px 10px; border-top:1px solid rgba(255,255,255,.09); font-size:13px; white-space:pre-wrap; }
+  .scoreboard-row.local { color:#ffccd0; background:rgba(255,48,56,.12); }
+  .kill-feed-row { background: rgba(0,0,0,.62); border-left: 3px solid var(--red); padding: 6px 10px; font-size: 12px; }
+  .bar-track { width: 240px; height: 12px; background: rgba(0,0,0,.62); border: 1px solid rgba(255,255,255,.25); border-radius: 3px; overflow: hidden; margin-top: 5px; }
+  .bar-fill { height: 100%; transition: width .18s ease-out; }
+  #health-fill { background: linear-gradient(90deg,#d51620,#ff6168); width: 100%; }
+  #shield-fill { background: linear-gradient(90deg,#287cd8,#75d0ff); width: 0%; }
+  #health-fill[data-critical="true"] { animation: pulse-health .65s infinite alternate; }
+  #xp-fill { background: linear-gradient(90deg,#287cd8,#75d0ff); width: 0%; }
+  #xp-text { margin-top: 5px; font-size: 11px; color: #cbd2dc; }
+  #ammo { font-size: 32px; font-weight: 900; letter-spacing: 1px; }
+  #weapon-name { font-size: 13px; opacity: .82; }
+  #level-badge { font-size: 23px; font-weight: 900; }
+  #prestige-badge { font-size: 12px; color: var(--gold); font-weight: 800; }
+  #toast-container { position: absolute; top: 82px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 7px; align-items: center; }
+  .toast { background: rgba(13,14,18,.93); border: 1px solid var(--line); border-left: 4px solid var(--red); padding: 8px 15px; border-radius: 5px; font-size: 13px; animation: fadeout 3.6s forwards; box-shadow: 0 8px 25px rgba(0,0,0,.35); }
+  .toast-xp { border-left-color: #4eaaff; }
+  .toast-unlock, .toast-prestige { border-left-color: var(--gold); }
+  .toast-network { border-left-color: #4cff99; }
+  .toast-error { border-left-color: #ff2e38; }
+
+  #blocker { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: 24px; overflow: auto; background: radial-gradient(circle at top, rgba(120,0,8,.22), transparent 42%), rgba(0,0,0,.84); color: #fff; }
+  #blocker.hidden { display: none; }
+  .menu-panel { width: min(1060px, 96vw); max-height: 94vh; overflow: auto; padding: 24px; background: linear-gradient(145deg, rgba(18,19,24,.97), rgba(7,8,11,.98)); border: 1px solid rgba(255,55,65,.38); border-radius: 12px; box-shadow: 0 25px 80px rgba(0,0,0,.72); text-align: left; }
+  .menu-header { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
+  .menu-header h1 { margin: 0; font-size: clamp(34px, 6vw, 68px); line-height: .9; letter-spacing: 3px; }
+  .menu-header h1 span { color: var(--red); }
+  .menu-header p { margin: 8px 0 0; color: var(--muted); }
+  .server-pill { min-width: 160px; padding: 10px 13px; text-align: center; border: 1px solid rgba(255,255,255,.15); background: rgba(0,0,0,.35); border-radius: 6px; }
+  #connection-text { font-size: 12px; font-weight: 900; letter-spacing: 1.2px; color: var(--gold); }
+  #connection-detail { margin-top: 4px; color: var(--muted); font-size: 11px; max-width: 360px; overflow-wrap: anywhere; }
+  .menu-grid { display: grid; grid-template-columns: minmax(280px, .85fr) minmax(360px, 1.4fr); gap: 18px; }
+  .card { padding: 17px; background: var(--panel-soft); border: 1px solid var(--line); border-radius: 8px; }
+  .card h2, .card h3 { margin: 0 0 12px; letter-spacing: 1px; }
+  .field { display: grid; gap: 6px; margin-bottom: 12px; }
+  .field label { font-size: 11px; color: #c5c8cf; font-weight: 800; letter-spacing: .8px; }
+  input, select { width: 100%; padding: 10px 11px; color: #fff; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.17); border-radius: 5px; outline: none; }
+  input:focus, select:focus { border-color: rgba(255,48,56,.75); box-shadow: 0 0 0 2px rgba(255,48,56,.12); }
+  .button-row { display: flex; flex-wrap: wrap; gap: 9px; }
+  .button { border: 1px solid rgba(255,255,255,.15); border-radius: 5px; padding: 10px 13px; color: #fff; background: #272a31; font-weight: 850; letter-spacing: .5px; }
+  .button.primary { background: linear-gradient(180deg,#e52832,#9c1118); border-color: #ff5960; }
+  .button.gold { background: linear-gradient(180deg,#cc8615,#845007); border-color: #ffbf47; }
+  .button.ghost { background: rgba(255,255,255,.045); }
+  .server-note { margin-top: 12px; padding: 9px 10px; color: #b9bec8; background: rgba(0,0,0,.28); border-left: 3px solid var(--red); font-size: 11px; line-height: 1.5; }
+  #room-list { display: grid; gap: 8px; max-height: 280px; overflow: auto; }
+  .room-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px; color: #fff; background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.12); border-radius: 5px; text-align: left; }
+  .room-row:hover:not(:disabled) { border-color: rgba(255,48,56,.7); transform: translateY(-1px); }
+  .room-row span { display: grid; gap: 2px; }
+  .room-row small { color: var(--muted); }
+  .empty-state { padding: 15px; text-align: center; color: var(--muted); border: 1px dashed rgba(255,255,255,.14); border-radius: 5px; }
+  #current-lobby { margin-top: 14px; }
+  #lobby-players { display: grid; gap: 6px; margin: 10px 0; }
+  .lobby-player { display: flex; justify-content: space-between; padding: 8px 10px; background: rgba(0,0,0,.3); border-radius: 4px; }
+  .lobby-player b { color: var(--gold); }
+  .controls-note { margin-top: 17px; color: #aeb3bd; font-size: 12px; text-align: center; }
+
+  #progression-toggle { position: fixed; z-index: 12; left: 22px; top: 116px; pointer-events: auto; }
+  #progression-panel { position: fixed; inset: 4vh 4vw; z-index: 30; overflow: auto; padding: 22px; color: #fff; background: rgba(7,8,11,.98); border: 1px solid rgba(255,55,65,.42); border-radius: 10px; box-shadow: 0 25px 90px #000; }
+  .panel-header { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+  .rank-summary { display: grid; grid-template-columns: repeat(4,minmax(110px,1fr)); gap: 9px; margin: 15px 0; }
+  .summary-box { padding: 12px; background: rgba(255,255,255,.045); border: 1px solid var(--line); border-radius: 6px; }
+  .summary-box small { display: block; color: var(--muted); }
+  .summary-box strong { font-size: 18px; }
+  .progression-columns { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+  .section-box { padding: 14px; background: rgba(255,255,255,.035); border: 1px solid var(--line); border-radius: 7px; }
+  .section-box h3 { margin-top: 0; }
+  .progression-row, .history-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.07); font-size: 13px; }
+  .row-rank { min-width: 58px; color: var(--gold); font-weight: 850; }
+  .history-row time { color: var(--muted); font-size: 11px; }
+  .challenge-card, .mastery-card { margin-bottom: 9px; padding: 10px; background: rgba(0,0,0,.28); border-radius: 5px; }
+  .challenge-card > div:first-child, .mastery-card > div:first-child { display: flex; justify-content: space-between; gap: 10px; }
+  .challenge-card span, .mastery-card span { color: var(--gold); }
+  .challenge-card small, .mastery-card small { color: var(--muted); }
+  .mini-track { height: 6px; margin-top: 7px; background: rgba(255,255,255,.1); border-radius: 4px; overflow: hidden; }
+  .mini-track > div { height: 100%; background: linear-gradient(90deg,var(--red),var(--gold)); }
+  .challenge-group h4 { color: var(--gold); letter-spacing: 1px; }
+
+  #level-up-banner { position: fixed; inset: 0; z-index: 45; pointer-events: none; display: grid; place-items: center; background: radial-gradient(circle, rgba(255,28,38,.18), transparent 42%); animation: levelup 2.5s ease forwards; }
+  #level-up-value { font-size: clamp(58px,10vw,120px); font-weight: 1000; color: #fff; text-shadow: 0 0 24px rgba(255,35,45,.9); }
+  #prestige-modal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.82); }
+  .modal-card { width: min(520px,95vw); padding: 22px; background: #101117; border: 1px solid rgba(255,182,46,.6); border-radius: 8px; color: #fff; }
+  @keyframes fadeout { 0%,75% { opacity:1; transform: translateY(0); } 100% { opacity:0; transform: translateY(-8px); } }
+  @keyframes pulse-health { from { filter: brightness(.8); } to { filter: brightness(1.5); } }
+  @keyframes levelup { 0% { opacity:0; transform:scale(.78); } 18%,72% { opacity:1; transform:scale(1); } 100% { opacity:0; transform:scale(1.12); } }
+  @media (max-width: 780px) {
+    .menu-grid, .progression-columns { grid-template-columns: 1fr; }
+    .rank-summary { grid-template-columns: repeat(2,1fr); }
+    .menu-header { align-items: flex-start; flex-direction: column; }
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<div id="hud">
+  <div id="crosshair"></div>
+  <div id="damage-indicator"></div>
+  <div id="hitmarker"><svg viewBox="0 0 24 24"><g stroke="#fff" stroke-width="2"><line x1="2" y1="2" x2="9" y2="9"/><line x1="22" y1="2" x2="15" y2="9"/><line x1="2" y1="22" x2="9" y2="15"/><line x1="22" y1="22" x2="15" y2="15"/></g></svg></div>
+  <div id="top-left">
+    <div id="level-badge">LEVEL 1</div>
+    <div id="prestige-badge">PRESTIGE 0</div>
+    <div class="bar-track"><div id="xp-fill" class="bar-fill"></div></div>
+    <div id="xp-text">0 / 550 XP</div>
+  </div>
+  <div id="network-status" data-online="false">OFFLINE</div>
+  <div id="br-status" hidden></div>
+  <div id="kill-feed"></div>
+  <div id="scoreboard" hidden><div id="scoreboard-title">SCOREBOARD</div><div id="scoreboard-rows"></div></div>
+  <div id="bottom-left"><div id="shield-track" class="bar-track" hidden><div id="shield-fill" class="bar-fill"></div></div><div class="bar-track"><div id="health-fill" class="bar-fill"></div></div></div>
+  <div id="bottom-right"><div id="ammo">30 / 90</div><div id="weapon-name">ASSAULT RIFLE</div></div>
+  <div id="toast-container"></div>
+</div>
+
+<button id="progression-toggle" class="button ghost" type="button">PROGRESSION [P]</button>
+
+<div id="blocker">
+  <div class="menu-panel">
+    <div class="menu-header">
+      <div><h1>STREET<span>KILLAZ</span></h1><p>Official multiplayer, PVP, and Zombies connection center</p><img src="./assets/maps/downtown-lockup-concept.png" alt="Downtown Lockup map concept" style="display:block;width:min(420px,72vw);margin-top:12px;border:1px solid rgba(255,255,255,.16);border-radius:6px;opacity:.9" /><div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:6px;width:min(420px,72vw);margin-top:6px"><img src="./assets/character-assets/streetkilla-operator-turnaround.png" alt="StreetKilla operator turnaround" style="width:100%;height:74px;object-fit:cover;object-position:center;border:1px solid rgba(255,255,255,.16);border-radius:4px" /><img src="./assets/gun-assets/cdg58-concept.png" alt="CDG-58 concept" style="width:100%;height:74px;object-fit:cover;border:1px solid rgba(255,255,255,.16);border-radius:4px" /><img src="./assets/gun-assets/kvb73-concept.png" alt="KVB-73 concept" style="width:100%;height:74px;object-fit:cover;border:1px solid rgba(255,255,255,.16);border-radius:4px" /></div></div>
+      <div class="server-pill"><div id="connection-text">CHECKING VPS…</div><div id="connection-detail">147.189.172.104:7076</div></div>
+    </div>
+
+    <div class="menu-grid">
+      <section class="card">
+        <h2>SERVER CONNECTION</h2>
+        <div class="field"><label for="player-name">PLAYER NAME</label><input id="player-name" maxlength="24" value="StreetKilla" autocomplete="nickname" /></div>
+        <div class="field"><label for="starting-weapon">STARTING WEAPON</label><select id="starting-weapon"><option value="cdg58">CDG-58 — Assault Rifle</option><option value="mtz762">MTZ-762 — Battle Rifle</option><option value="lach9">Lach-9 — SMG</option><option value="kvb73">KVB-73 — Sniper Rifle</option><option value="glock21">Glock 21 — Pistol</option></select><small style="color:#9ba0aa">Your choice appears in first person and is used online when the match starts.</small></div>
+        <div class="field"><label for="server-url">OFFICIAL SERVER</label><input id="server-url" value="ws://147.189.172.104:7076" spellcheck="false" /></div>
+        <div class="field"><label>VISUAL MOTION</label><input id="motion-intensity" type="range" min="0" max="1" step="0.05" value="0.55" /><small style="color:#9ba0aa"><label><input id="camera-shake" type="checkbox" checked /> Camera shake</label> &nbsp; <label><input id="head-bob" type="checkbox" checked /> Head bob</label> &nbsp; <label><input id="weapon-sway" type="checkbox" checked /> Weapon sway</label></small></div>
+        <div class="button-row">
+          <button id="connect-server" class="button primary" type="button">CONNECT</button>
+          <button id="play-offline" class="button ghost" type="button">PLAY OFFLINE</button>
+        </div>
+        <div class="server-note">The game now connects automatically when this page loads. Launch StreetKillaz through <b>start-game.bat</b>; do not double-click index.html with a <b>file://</b> address.</div>
+      </section>
+
+      <section class="card">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px">
+          <h2 style="margin:0">MATCHMAKING</h2>
+          <button id="refresh-rooms" class="button ghost" type="button" disabled>REFRESH</button>
+        </div>
+        <div class="field"><label for="room-mode">CREATE MODE</label><select id="room-mode"><option value="team-deathmatch">TEAM DEATHMATCH</option></select></div>
+        <button id="create-room" class="button gold" type="button" disabled>CREATE LOBBY</button>
+        <div id="room-list" style="margin-top:12px"><div class="empty-state">Connect to the VPS to load public rooms.</div></div>
+
+        <div id="current-lobby" class="card" hidden>
+          <h3 id="lobby-title">CURRENT LOBBY</h3>
+          <div id="lobby-players"></div>
+          <div class="button-row">
+            <button id="start-room" class="button primary" type="button">START MATCH</button>
+            <button id="enter-online-match" class="button gold" type="button" hidden>ENTER MATCH</button>
+            <button id="leave-room" class="button ghost" type="button">LEAVE</button>
+          </div>
+        </div>
+      </section>
+    </div>
+    <div class="controls-note">WASD move • Mouse look • Left Click fire • Right Click ADS • R reload • E pickup/interact • F melee • G grenade • Shift sprint • C/CTRL crouch • Space jump • Esc opens this menu</div>
+  </div>
+</div>
+
+<section id="progression-panel" hidden>
+  <div class="panel-header"><div><h2 style="margin:0">STREETKILLAZ PROGRESSION</h2><div id="panel-rank-display">Prestige 0 | Level 1</div></div><button id="progression-close" class="button ghost" type="button">CLOSE</button></div>
+  <div class="rank-summary">
+    <div class="summary-box"><small>LEVEL XP</small><strong id="panel-xp-display">0 / 550 XP</strong></div>
+    <div class="summary-box"><small>LIFETIME XP</small><strong id="panel-lifetime-xp">0</strong></div>
+    <div class="summary-box"><small>PERMANENT XP BOOST</small><strong id="panel-xp-boost">+0%</strong></div>
+    <div class="summary-box"><small>PRESTIGE</small><button id="prestige-button" class="button gold" type="button" disabled>REACH LEVEL 55</button></div>
+  </div>
+  <div class="progression-columns">
+    <div class="section-box"><h3>NEXT LEVEL REWARDS</h3><div id="reward-preview"></div></div>
+    <div class="section-box"><h3>DAILY / WEEKLY CHALLENGES</h3><div id="challenge-list"></div></div>
+    <div class="section-box"><h3>WEAPON MASTERY</h3><div id="weapon-mastery"></div></div>
+    <div class="section-box"><h3>LEVEL HISTORY</h3><div id="level-history"></div></div>
+  </div>
+</section>
+
+<div id="level-up-banner" hidden><div id="level-up-value">LEVEL 2</div></div>
+<div id="prestige-modal" hidden><div class="modal-card"><h2>CONFIRM PRESTIGE</h2><div id="prestige-modal-text"></div><div class="button-row"><button id="prestige-confirm" class="button gold" type="button">PRESTIGE</button><button id="prestige-cancel" class="button ghost" type="button">CANCEL</button></div></div></div>
+
+<script type="module" src="./src/main.js?v=20260824"></script>
+</body>
+</html>
