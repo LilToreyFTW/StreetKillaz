@@ -7,7 +7,12 @@ const DEFAULT_SERVER = VITE_SERVER_URL || (window.location.protocol === 'https:'
 
 export function resolveServerUrl() {
   const query = new URLSearchParams(window.location.search).get('server');
-  const stored = window.localStorage.getItem('streetkillaz.serverUrl');
+  const savedServer = window.localStorage.getItem('streetkillaz.serverUrl');
+  // A legacy raw ws:// endpoint cannot work from an HTTPS site. Ignore it so
+  // a previous test setting cannot trap a Vercel deployment in a reconnect loop.
+  const stored = window.location.protocol === 'https:' && savedServer?.startsWith('ws://')
+    ? null
+    : savedServer;
   // A deployment-provided secure endpoint wins over a legacy browser setting.
   // This prevents an old ws:// IP saved locally from breaking a Vercel build.
   const configured = query || VITE_SERVER_URL || stored || DEFAULT_SERVER;
