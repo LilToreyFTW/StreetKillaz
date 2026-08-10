@@ -1,4 +1,7 @@
-const DEFAULT_SERVER = 'ws://147.189.172.104:7076';
+// Set VITE_SERVER_URL in Vercel to a TLS-terminated endpoint such as
+// wss://ws.your-domain.com. The raw VPS IP only supports ws:// for local HTTP.
+const VITE_SERVER_URL = import.meta.env?.VITE_SERVER_URL;
+const DEFAULT_SERVER = VITE_SERVER_URL || 'ws://147.189.172.104:7076';
 
 export function resolveServerUrl() {
   const query = new URLSearchParams(window.location.search).get('server');

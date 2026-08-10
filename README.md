@@ -19,6 +19,11 @@ Vercel serves the `dist` folder. The authoritative WebSocket server remains on
 the VPS; configure the production client to use a secure `wss://` endpoint
 before serving the game over HTTPS.
 
+Set `VITE_SERVER_URL=wss://ws.your-domain.com` in the Vercel project
+environment variables, then redeploy. A raw IP with port 7076 cannot provide a
+trusted certificate for browser WebSockets; put the VPS Node server behind a
+TLS reverse proxy such as Caddy or Nginx on a domain you control.
+
 StreetKillaz is a browser-based Three.js FPS prototype with:
 
 - Offline target arena and local Zombies testing
