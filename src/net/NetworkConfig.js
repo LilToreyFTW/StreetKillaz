@@ -6,7 +6,9 @@ const DEFAULT_SERVER = VITE_SERVER_URL || 'ws://147.189.172.104:7076';
 export function resolveServerUrl() {
   const query = new URLSearchParams(window.location.search).get('server');
   const stored = window.localStorage.getItem('streetkillaz.serverUrl');
-  const configured = query || stored || DEFAULT_SERVER;
+  // A deployment-provided secure endpoint wins over a legacy browser setting.
+  // This prevents an old ws:// IP saved locally from breaking a Vercel build.
+  const configured = query || VITE_SERVER_URL || stored || DEFAULT_SERVER;
 
   if (window.location.protocol === 'https:' && configured.startsWith('ws://')) {
     return configured.replace(/^ws:/, 'wss:');
