@@ -1,7 +1,9 @@
-// Set VITE_SERVER_URL in Vercel to a TLS-terminated endpoint such as
-// wss://ws.your-domain.com. The raw VPS IP only supports ws:// for local HTTP.
+// Set VITE_SERVER_URL in Vercel to override this endpoint if the server moves.
+// The TLS endpoint is reverse-proxied by the VPS Caddy instance to port 7076.
 const VITE_SERVER_URL = import.meta.env?.VITE_SERVER_URL;
-const DEFAULT_SERVER = VITE_SERVER_URL || 'ws://147.189.172.104:7076';
+const LOCAL_SERVER = 'ws://147.189.172.104:7076';
+const DEPLOYED_SERVER = 'wss://streetkillaz.147-189-172-104.sslip.io';
+const DEFAULT_SERVER = VITE_SERVER_URL || (window.location.protocol === 'https:' ? DEPLOYED_SERVER : LOCAL_SERVER);
 
 export function resolveServerUrl() {
   const query = new URLSearchParams(window.location.search).get('server');
